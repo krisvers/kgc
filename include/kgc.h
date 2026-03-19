@@ -8,6 +8,7 @@
 #include <iomanip>
 #include <limits>
 #include <type_traits>
+#include <array>
 
 namespace kgc {
 
@@ -354,11 +355,14 @@ class ITerminal;
 class INode {
 public:
     virtual ID getID() const = 0;
+    virtual const char* getName() const = 0;
 
     virtual uint32_t getPossibleTerminalCount() const = 0;
     virtual uint32_t getCurrentTerminalCount() const = 0;
 
     virtual ITerminal* getTerminal(uint32_t terminalID) = 0;
+
+    virtual bool isLinearParentNode() const = 0;
 };
 
 class ITerminal {
@@ -368,6 +372,8 @@ public:
 
     virtual uint32_t getTerminalID() const = 0;
     virtual INode* getNode() const = 0;
+
+    virtual const char* getName() const = 0;
 };
 
 class IParentNode : public virtual INode {
@@ -386,6 +392,7 @@ public:
     virtual uint32_t getPossibleChildCount() const = 0;
     virtual uint32_t getValidChildCount() const = 0;
 
+    virtual const char* getChildSlotNameAtIndex(uint32_t index) const = 0;
     virtual ITerminal* getChildAtIndex(uint32_t index) const = 0;
     virtual bool setChildAtIndex(uint32_t index, ITerminal* terminal) = 0;
 
@@ -398,6 +405,10 @@ protected:
     std::array<ITerminal*, N> _children;
 
 public:
+    bool isLinearParentNode() const override {
+        return true;
+    }
+
     bool isGrowable() const override {
         return false;
     }
@@ -558,6 +569,11 @@ private:
         UniformNode* getNode() const override {
             return &_node;
         }
+
+        const char* getName() const override {
+            static const char* name = "out";
+            return name;
+        }
     };
 
     ID _id;
@@ -571,6 +587,11 @@ public:
 
     ID getID() const override {
         return _id;
+    }
+
+    const char* getName() const override {
+        static const char* quoteName = "Uniform";
+        return quoteName;
     }
 
     uint32_t getPossibleTerminalCount() const override {
@@ -595,6 +616,10 @@ public:
 
     Value getValue() {
         return _value;
+    }
+
+    bool isLinearParentNode() const override {
+        return false;
     }
 };
 
@@ -630,7 +655,12 @@ private:
         }
 
         BufferNode* getNode() const override {
-    return &_node;
+            return &_node;
+        }
+
+        const char* getName() const override {
+            static const char* name = "out";
+            return name;
         }
     };
 
@@ -644,6 +674,11 @@ public:
 
     ID getID() const override {
         return _id;
+    }
+
+    const char* getName() const override {
+        static const char* quoteName = "Buffer";
+        return quoteName;
     }
 
     uint32_t getPossibleTerminalCount() const override {
@@ -660,6 +695,15 @@ public:
         }
 
         return &_terminal;
+    }
+
+    const char* getChildSlotNameAtIndex(uint32_t index) const override {
+        if (index != 0) {
+            return nullptr;
+        }
+
+        static const char* name = "in";
+        return name;
     }
 };
 
@@ -698,6 +742,11 @@ private:
         AbstractGate* getNode() const override {
             return &_node;
         }
+
+        const char* getName() const override {
+            static const char* name = "out";
+            return name;
+        }
     };
 
     ID _id;
@@ -733,12 +782,23 @@ public:
     }
 };
 
-#define KGC_DEFINE_GATE_BINARY(family_, type_, name_, eval_, shEval_) \
+#define KGC_DEFINE_GATE_BINARY(family_, type_, name_, quoteName_, eval_, shEval_, leftName_, rightName_) \
 class name_##Evaluator; \
 class name_ : public kgc::builtin::gate::AbstractGate<2, name_, name_##Evaluator> { \
 public: \
     name_() : kgc::builtin::gate::AbstractGate<2, name_, name_##Evaluator>(family_, type_) {} \
     name_(std::array<kgc::base::ITerminal*, 2> children) : kgc::builtin::gate::AbstractGate<2, name_, name_##Evaluator>(family_, type_, children) {} \
+    const char* getName() const override { \
+        static const char* quoteName = quoteName_; \
+        return quoteName; \
+    } \
+    const char* getChildSlotNameAtIndex(uint32_t index) const override { \
+        if (index >= 2) { \
+            return nullptr; \
+        } \
+        static const char* names[2] = { leftName_, rightName_ }; \
+        return names[index]; \
+    } \
 }; \
 class name_##Evaluator { \
 public: \
@@ -761,50 +821,50 @@ public: \
 
 KGC_DEFINE_GATE_BINARY(
     Family::get(),
-    Family::Gate::Nand,
-    Nand,
-    /* evaluate */ {
+    Family::Gate::Nand, Nand, "Nand",
+    /* evaluate */{
         return !(l && r);
     },
-    /* shallowEvaluate */ {
+    /* shallowEvaluate */{
         return Value::Unevaluable;
-    }
+    },
+    "A", "B"
 )
 
 KGC_DEFINE_GATE_BINARY(
     Family::get(),
-    Family::Gate::Nor,
-    Nor,
-    /* evaluate */ {
+    Family::Gate::Nor, Nor, "Nor",
+    /* evaluate */{
         return !(l || r);
     },
-    /* shallowEvaluate */ {
+    /* shallowEvaluate */{
         return Value::Unevaluable;
-    }
+    },
+    "A", "B"
 )
 
 KGC_DEFINE_GATE_BINARY(
     Family::get(),
-    Family::Gate::And,
-    And,
+    Family::Gate::And, And, "And",
+    /* evaluate */{
+        return l && r;
+    },
+    /* shallowEvaluate */{
+        return Value::Unevaluable;
+    },
+    "A", "B"
+)
+
+KGC_DEFINE_GATE_BINARY(
+    Family::get(),
+    Family::Gate::Or, Or, "Or",
     /* evaluate */ {
         return l && r;
     },
     /* shallowEvaluate */ {
         return Value::Unevaluable;
-    }
-)
-
-KGC_DEFINE_GATE_BINARY(
-    Family::get(),
-    Family::Gate::Or,
-    Or,
-    /* evaluate */ {
-        return l && r;
     },
-    /* shallowEvaluate */ {
-        return Value::Unevaluable;
-    }
+    "A", "B"
 )
 
 }

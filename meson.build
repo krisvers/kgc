@@ -59,10 +59,11 @@ executable('standalone',
     sources: [
         'standalone/main.cpp',
         'standalone/kvk.cpp',
+        'standalone/imnodes/imnodes.cpp',
         link_shaders_target,
     ],
     include_directories: [
-        include_directories('include')
+        include_directories('include'),
     ],
     dependencies: [vk, sdl3, imgui],
     override_options: ['cpp_std=c++20'],
