@@ -1,0 +1,15 @@
+*.exe
+*.o
+*.obj
+*.so
+*.dll
+*.dylib
+
+.DS_Store
+.cache/
+
+build/
+out/
+
+subprojects/*
+!*.wrap
